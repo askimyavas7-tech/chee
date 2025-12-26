@@ -1,7 +1,4 @@
-# Copyright (c) 2025 AnonymousX1025
-# Licensed under the MIT License.
-# This file is part of AnonXMusic
-
+#
 import time
 from ntgcalls import (ConnectionNotFound, TelegramServerError,
                       RTMPStreamingUnsupported)
@@ -39,6 +36,11 @@ class TgCall(PyTgCalls):
             await client.leave_call(chat_id, close=False)
         except:
             pass
+
+    # --- YENİ EKLENEN LOOP FONKSİYONU ---
+    async def loop(self, chat_id: int, count: int) -> None:
+        """Döngü sayısını veritabanına (RAM) kaydeder."""
+        await db.set_loop(chat_id, count)
 
     async def play_media(
         self,
@@ -81,6 +83,8 @@ class TgCall(PyTgCalls):
                 media.played_prefix = 0
                 media.time = 1
                 await db.add_call(chat_id)
+                
+                # Mesaj formatı
                 text = _lang["play_media"].format(
                     media.url,
                     media.title,
@@ -88,17 +92,30 @@ class TgCall(PyTgCalls):
                     media.user,
                 )
                 keyboard = buttons.controls(chat_id)
+                
+                # Mesajı gönderme veya düzenleme
                 try:
-                    await message.edit_text(
-                        text=text,
-                        reply_markup=keyboard,
-                    )
+                    if message:
+                        await message.edit_text(
+                            text=text,
+                            reply_markup=keyboard,
+                        )
+                    else:
+                        # Eğer mesaj objesi yoksa yeni gönder
+                        msg = await app.send_message(
+                            chat_id=chat_id,
+                            text=text,
+                            reply_markup=keyboard,
+                        )
+                        media.message_id = msg.id
                 except MessageIdInvalid:
                     media.message_id = (await app.send_message(
                         chat_id=chat_id,
                         text=text,
                         reply_markup=keyboard,
                     )).id
+                except Exception:
+                    pass
             else:
                 # Seek yapılıyorsa played_prefix güncellenir
                 media.played_prefix = seek_time
@@ -155,8 +172,34 @@ class TgCall(PyTgCalls):
         await self.play_media(chat_id, msg, media)
 
     async def play_next(self, chat_id: int) -> None:
+        """
+        Sıradaki şarkıya geçen fonksiyon. 
+        Döngü kontrolü burada yapılır.
+        """
+        # 1. Önce DÖNGÜ kontrolü yap
+        loop_count = await db.get_loop(chat_id)
+        
+        if loop_count > 0:
+            # Döngü varsa sayıyı azalt
+            await db.decrease_loop(chat_id)
+            
+            # Sıradaki şarkıyı değil, MEVCUT şarkıyı tekrar al
+            media = queue.get_current(chat_id)
+            
+            if media:
+                _lang = await lang.get_lang(chat_id)
+                # Yeni bir bilgilendirme mesajı at (İsteğe bağlı, loop olduğu belli olsun diye)
+                msg = await app.send_message(chat_id=chat_id, text=_lang["play_next"]) 
+                media.message_id = msg.id
+                
+                # Şarkıyı tekrar oynat ve fonksiyondan çık
+                return await self.play_media(chat_id, msg, media)
+
+        # 2. Döngü yoksa normal sıradakine geç
         media = queue.get_next(chat_id)
+        
         try:
+            # Eski mesajı sil
             if media and media.message_id:
                 await app.delete_messages(
                     chat_id=chat_id,
@@ -193,15 +236,11 @@ class TgCall(PyTgCalls):
         return round(sum(pings) / len(pings), 2)
 
     async def decorators(self, client: PyTgCalls) -> None:
-        # BURADAKİ HATA DÜZELTİLDİ:
-        # Eski kodda 'for client in self.clients' vardı.
-        # Boot fonksiyonunda zaten döngü olduğu için burada tekrar döngüye gerek yok.
-        # Sadece parametre olarak gelen 'client' için decorator tanımlanmalı.
-        
         @client.on_update()
         async def update_handler(_, update: types.Update) -> None:
             if isinstance(update, types.StreamEnded):
                 if update.stream_type == types.StreamEnded.Type.AUDIO:
+                    # Şarkı bittiğinde play_next çağrılır (Loop kontrolü orada yapılır)
                     await self.play_next(update.chat_id)
             elif isinstance(update, types.ChatUpdate):
                 if update.status in [
@@ -217,5 +256,5 @@ class TgCall(PyTgCalls):
             client = PyTgCalls(ub, cache_duration=100)
             await client.start()
             self.clients.append(client)
-            await self.decorators(client) # Client tek tek gönderiliyor
+            await self.decorators(client)
         logger.info("PyTgCalls client(s) started.")
