@@ -3,7 +3,7 @@
 
 from pyrogram import filters, types
 
-from che import anon, app, db, lang, queue
+from che import che, app, db, lang, queue
 from che.helpers import can_manage_vc
 
 
