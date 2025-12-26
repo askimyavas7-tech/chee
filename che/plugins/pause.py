@@ -1,11 +1,9 @@
-# Copyright (c) 2025 AnonymousX1025
-# Licensed under the MIT License.
-# This file is part of AnonXMusic
+
 
 
 from pyrogram import filters, types
 
-from che import anon, app, db, lang
+from che import che, app, db, lang
 from che.helpers import buttons, can_manage_vc
 
 
