@@ -7,7 +7,7 @@ from pathlib import Path
 
 from pyrogram import filters, types
 
-from che import anon, app, config, db, lang, queue, tg, yt
+from che import che, app, config, db, lang, queue, tg, yt
 from che.helpers import buttons, utils
 from che.helpers._play import checkUB
 
