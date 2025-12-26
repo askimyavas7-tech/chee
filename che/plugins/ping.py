@@ -1,13 +1,11 @@
-# Copyright (c) 2025 AnonymousX1025
-# Licensed under the MIT License.
-# This file is part of AnonXMusic
+
 
 
 import time
 import psutil
 
 from pyrogram import filters, types
-from che import app, anon, boot, config, lang
+from che import app, che, boot, config, lang
 from che.helpers import buttons
 
 
