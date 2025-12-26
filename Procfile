@@ -1,1 +1,1 @@
-python3 -m che
+worker: bash start
