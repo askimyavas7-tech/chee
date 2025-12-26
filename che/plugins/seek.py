@@ -43,7 +43,7 @@ async def _seek(_, m: types.Message):
         if start_from + 10 > media.duration_sec:
             start_from = media.duration_sec - 5
 
-    await anon.play_media(m.chat.id, sent, media, start_from)
+    await che.play_media(m.chat.id, sent, media, start_from)
     media.time = start_from
     await sent.edit_text(
         m.lang["play_seeked"].format(stype, start_from, m.from_user.mention)
