@@ -1,13 +1,9 @@
-# Copyright (c) 2025 AnonymousX1025
-# Licensed under the MIT License.
-# This file is part of CheXMusic
 
 from random import randint
 from time import time
 from bson import ObjectId
 from pymongo import AsyncMongoClient
 
-# DEĞİŞİKLİK: anony -> che
 from che import config, logger, userbot
 
 
@@ -17,8 +13,9 @@ class MongoDB:
         MongoDB bağlantısını başlatır.
         """
         self.mongo = AsyncMongoClient(config.MONGO_URL, serverSelectionTimeoutMS=12500)
-        # DEĞİŞİKLİK: Anon -> Che (Veritabanı adı)
-        self.db = self.mongo.Che
+        
+        # KRİTİK DÜZELTME: Hata kodu 13297'yi önlemek için küçük harf 'che' kullanıldı.
+        self.db = self.mongo.che
 
         self.admin_list = {}
         self.active_calls = {}
@@ -126,7 +123,6 @@ class MongoDB:
     async def get_client(self, chat_id: int):
         if chat_id not in self.assistant:
             await self.get_assistant(chat_id)
-        # Dinamik asistan eşleşmesi
         client_map = {i+1: client for i, client in enumerate(userbot.clients)}
         return client_map.get(self.assistant[chat_id], userbot.one)
 
@@ -291,31 +287,30 @@ class MongoDB:
     async def migrate_coll(self) -> None:
         logger.info("Eski koleksiyonlardan veriler taşınıyor...")
         
-        # Kullanıcıları taşı
         musers = []
         done_users = set()
         
-        # Eski ve yeni tabloları tara
+        # Eski tabloları (tgusersdb) güvenli oku
         async for user in self.db.tgusersdb.find():
             uid = user.get("user_id") if isinstance(user.get("_id"), ObjectId) else user.get("_id")
             if uid and int(uid) not in done_users:
                 musers.append({"_id": int(uid)})
                 done_users.add(int(uid))
 
+        # Mevcut kullanıcıları oku
         async for user in self.usersdb.find():
-            uid = user.get("user_id") if isinstance(user.get("_id"), ObjectId) else user.get("_id")
-            if uid and int(uid) not in done_users:
-                musers.append({"_id": int(uid)})
-                done_users.add(int(uid))
+            uid = user.get("_id")
+            if uid and isinstance(uid, int) and uid not in done_users:
+                musers.append({"_id": uid})
+                done_users.add(uid)
 
         if musers:
             await self.usersdb.drop()
             try:
                 await self.usersdb.insert_many(musers, ordered=False)
             except Exception:
-                pass # Hatalı kayıtları atla
+                pass
 
-        # Sohbetleri taşı
         mchats = []
         done_chats = set()
         async for chat in self.chatsdb.find():
@@ -332,7 +327,7 @@ class MongoDB:
                 pass
 
         await self.cache.update_one({"_id": "migrated"}, {"$set": {"status": True}}, upsert=True)
-        logger.info("Taşıma işlemi tamamlandı.")
+        logger.info("Taşıma işlemi başarıyla tamamlandı.")
 
     async def load_cache(self) -> None:
         doc = await self.cache.find_one({"_id": "migrated"})
