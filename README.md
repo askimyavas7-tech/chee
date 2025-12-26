@@ -1,0 +1,1 @@
+che  sunar hepsi gunceledim
