@@ -12,7 +12,7 @@ from typing import Any, Optional, Tuple
 
 from pyrogram import filters, types
 
-from che import anon, app, config, db, lang, userbot
+from che import che, app, config, db, lang, userbot
 from che.helpers import format_exception, meval
 
 
