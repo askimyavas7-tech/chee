@@ -1,11 +1,9 @@
-
 from random import randint
 from time import time
 from bson import ObjectId
 from pymongo import AsyncMongoClient
 
 from che import config, logger, userbot
-
 
 class MongoDB:
     def __init__(self):
@@ -23,6 +21,12 @@ class MongoDB:
         self.blacklisted = []
         self.cmd_delete = []
         self.notified = []
+        
+        # --- LOOP (DÖNGÜ) HAFIZASI ---
+        # Veritabanına sürekli yazmamak için döngü sayılarını RAM'de tutuyoruz.
+        # Bot kapanırsa döngüler sıfırlanır, bu daha sağlıklıdır.
+        self.loop_queues = {} 
+        
         self.cache = self.db.cache
         self.logger = False
 
@@ -65,6 +69,8 @@ class MongoDB:
 
     async def remove_call(self, chat_id: int) -> None:
         self.active_calls.pop(chat_id, None)
+        # Arama bittiğinde o grubun döngüsünü de temizle
+        self.loop_queues.pop(chat_id, None)
 
     async def playing(self, chat_id: int, paused: bool = None) -> bool | None:
         if paused is not None:
@@ -209,13 +215,22 @@ class MongoDB:
             self.lang[chat_id] = doc["lang"] if doc else "en"
         return self.lang[chat_id]
 
-    # --- DÖNGÜ (LOOP) METOTLARI ---
-    async def set_loop(self, chat_id: int, mode: int):
-        await self.chatsdb.update_one({"_id": chat_id}, {"$set": {"loop": mode}}, upsert=True)
+    # --- DÖNGÜ (LOOP) METOTLARI (YENİLENDİ) ---
+    async def set_loop(self, chat_id: int, count: int):
+        """Döngü sayısını ayarlar (Örn: 3)"""
+        self.loop_queues[chat_id] = count
 
     async def get_loop(self, chat_id: int) -> int:
-        doc = await self.chatsdb.find_one({"_id": chat_id})
-        return doc.get("loop", 0) if doc else 0
+        """Kalan döngü sayısını verir"""
+        return self.loop_queues.get(chat_id, 0)
+
+    async def decrease_loop(self, chat_id: int):
+        """Şarkı her bittiğinde sayıyı 1 azaltır"""
+        if chat_id in self.loop_queues and self.loop_queues[chat_id] > 0:
+            self.loop_queues[chat_id] -= 1
+        else:
+            if chat_id in self.loop_queues:
+                del self.loop_queues[chat_id]
 
     # --- LOGLAYICI (LOGGER) METOTLARI ---
     async def is_logger(self) -> bool:
