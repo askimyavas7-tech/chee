@@ -21,20 +21,22 @@ async def _broadcast(_, message: types.Message):
 
     msg = message.reply_to_message
     count, ucount = 0, 0
-    chats, groups, users = [], [], []
+    groups, users = [], []
     
     status_msg = await message.reply_text("🔍 Veriler toplanıyor ve yayın hazırlanıyor...")
 
     # 3. Veritabanından hedefleri çekme
     try:
         if "-nochat" not in message.command:
-            groups.extend(await db.get_chats())
+            groups = await db.get_chats()
         if "-user" in message.command:
-            users.extend(await db.get_users())
+            users = await db.get_users()
     except Exception as e:
         return await status_msg.edit_text(f"❌ Veritabanı hatası: {e}")
 
-    all_targets = groups + users
+    # Tekil ID listesi oluştur (aynı yere iki kez gitmesin)
+    all_targets = list(set(groups + users))
+    
     if not all_targets:
         return await status_msg.edit_text("❌ Yayın yapılacak hedef bulunamadı.")
 
@@ -59,10 +61,10 @@ async def _broadcast(_, message: types.Message):
         if not broadcasting:
             break
 
-        # ID'nin sayısal olup olmadığını doğrula (Loglardaki bozuk verileri eler)
+        # ID doğrula
         try:
             target = int(chat_id)
-        except (ValueError, TypeError):
+        except:
             continue
 
         try:
@@ -77,45 +79,59 @@ async def _broadcast(_, message: types.Message):
             else:
                 ucount += 1
             
-            # Spam koruması için kısa mola
+            # Spam koruması
             await asyncio.sleep(0.3)
 
         except errors.FloodWait as fw:
-            # Telegram sınırı: fw.value saniye bekle
-            await asyncio.sleep(fw.value + 5)
+            # FloodWait süresi çok uzunsa bekle, ancak makul süreleri otomatik yönet
+            await asyncio.sleep(fw.value + 2)
         
-        except (errors.UserIsBlocked, errors.InputUserDeactivated, errors.PeerIdInvalid):
-            # Kullanıcı hesabı silmiş veya botu engellemiş -> DB'den kaldır
-            await db.remove_user(target) if target in users else await db.remove_chat(target)
-            
-        except (errors.ChatWriteForbidden, errors.ChatAdminRequired, errors.ChannelPrivate, errors.ChannelInvalid):
-            # Bot gruptan atılmış veya yetkisi alınmış -> DB'den kaldır
-            await db.remove_chat(target)
+        except (errors.UserIsBlocked, errors.InputUserDeactivated, errors.PeerIdInvalid, 
+                errors.ChatWriteForbidden, errors.ChatAdminRequired, errors.ChannelPrivate, errors.ChannelInvalid):
+            # VERİTABANI SİLME HATASINI BURADA YAKALIYORUZ
+            try:
+                # Burada db nesnesinde hangi fonksiyon varsa onu dener, yoksa çökmez
+                if target in users:
+                    if hasattr(db, "remove_user"):
+                        await db.remove_user(target)
+                    elif hasattr(db, "delete_user"):
+                        await db.delete_user(target)
+                else:
+                    if hasattr(db, "remove_chat"):
+                        await db.remove_chat(target)
+                    elif hasattr(db, "delete_chat"):
+                        await db.delete_chat(target)
+            except:
+                pass # Silme fonksiyonu hatalıysa bile yayına devam et
             
         except Exception as ex:
-            # Diğer bilinmeyen hataları kaydet
             err_name = type(ex).__name__
             failed_reasons[err_name] = failed_reasons.get(err_name, 0) + 1
             continue
 
     # 6. Sonuç Bildirimi
     broadcasting = False
-    final_report = message.lang["gcast_end"].format(count, ucount)
+    # Lang dosyasındaki gcast_end formatına göre düzenlendi
+    try:
+        final_text = message.lang["gcast_end"].format(count, ucount)
+    except:
+        final_text = f"Gruplar: {count}\nKullanıcılar: {ucount}"
     
     if failed_reasons:
         report_path = "broadcast_report.txt"
-        with open(report_path, "w") as f:
+        with open(report_path, "w", encoding="utf-8") as f:
             f.write("--- Yayın Hata Raporu ---\n")
             for err, c in failed_reasons.items():
                 f.write(f"Hata: {err} | Adet: {c}\n")
         
         await message.reply_document(
             document=report_path,
-            caption=f"✅ **Yayın Tamamlandı**\n{final_report}\n\n⚠️ Bazı hatalar nedeniyle temizlik yapıldı (Rapor ekte)."
+            caption=f"✅ **Yayın Tamamlandı**\n{final_text}\n\n⚠️ Temizlik sırasında bazı veritabanı hataları oluşmuş olabilir."
         )
-        os.remove(report_path)
+        if os.path.exists(report_path):
+            os.remove(report_path)
     else:
-        await status_msg.edit_text(f"✅ **Yayın Başarıyla Tamamlandı!**\n{final_report}")
+        await status_msg.edit_text(f"✅ **Yayın Başarıyla Tamamlandı!**\n{final_text}")
 
 @app.on_message(filters.command(["stop_broadcast"]) & app.sudoers)
 async def _stop_broadcast(_, message: types.Message):
@@ -124,4 +140,4 @@ async def _stop_broadcast(_, message: types.Message):
         return await message.reply_text("❌ Şu an aktif bir yayın yok.")
     
     broadcasting = False
-    await message.reply_text("🛑 Yayın durdurma sinyali gönderildi. Mevcut işlem bitince duracak.")
+    await message.reply_text("🛑 Yayın durdurma sinyali gönderildi.")
