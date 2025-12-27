@@ -1,4 +1,3 @@
-#
 import time
 from ntgcalls import (ConnectionNotFound, TelegramServerError,
                       RTMPStreamingUnsupported)
@@ -29,6 +28,7 @@ class TgCall(PyTgCalls):
         try:
             queue.clear(chat_id)
             await db.remove_call(chat_id)
+            await db.set_loop(chat_id, 0)  # Durdurunca döngüyü sıfırla
         except:
             pass
 
@@ -37,9 +37,8 @@ class TgCall(PyTgCalls):
         except:
             pass
 
-    # --- YENİ EKLENEN LOOP FONKSİYONU ---
     async def loop(self, chat_id: int, count: int) -> None:
-        """Döngü sayısını veritabanına (RAM) kaydeder."""
+        """Döngü sayısını ayarlar."""
         await db.set_loop(chat_id, count)
 
     async def play_media(
@@ -53,7 +52,9 @@ class TgCall(PyTgCalls):
         _lang = await lang.get_lang(chat_id)
         
         if not media.file_path:
-            await message.edit_text(_lang["error_no_file"].format(config.SUPPORT_CHAT))
+            # Dosya yolu yoksa hata ver ve sonrakine geç
+            if message:
+                await message.edit_text(_lang["error_no_file"].format(config.SUPPORT_CHAT))
             return await self.play_next(chat_id)
 
         # Video flag ayarı
@@ -101,7 +102,6 @@ class TgCall(PyTgCalls):
                             reply_markup=keyboard,
                         )
                     else:
-                        # Eğer mesaj objesi yoksa yeni gönder
                         msg = await app.send_message(
                             chat_id=chat_id,
                             text=text,
@@ -109,11 +109,13 @@ class TgCall(PyTgCalls):
                         )
                         media.message_id = msg.id
                 except MessageIdInvalid:
-                    media.message_id = (await app.send_message(
+                    # Mesaj silinmişse yenisini at
+                    msg = await app.send_message(
                         chat_id=chat_id,
                         text=text,
                         reply_markup=keyboard,
-                    )).id
+                    )
+                    media.message_id = msg.id
                 except Exception:
                     pass
             else:
@@ -121,20 +123,25 @@ class TgCall(PyTgCalls):
                 media.played_prefix = seek_time
 
         except FileNotFoundError:
-            await message.edit_text(_lang["error_no_file"].format(config.SUPPORT_CHAT))
+            if message:
+                await message.edit_text(_lang["error_no_file"].format(config.SUPPORT_CHAT))
             await self.play_next(chat_id)
         except exceptions.NoActiveGroupCall:
             await self.stop(chat_id)
-            await message.edit_text(_lang["error_no_call"])
+            if message:
+                await message.edit_text(_lang["error_no_call"])
         except exceptions.NoAudioSourceFound:
-            await message.edit_text(_lang["error_no_audio"])
+            if message:
+                await message.edit_text(_lang["error_no_audio"])
             await self.play_next(chat_id)
         except (ConnectionNotFound, TelegramServerError):
             await self.stop(chat_id)
-            await message.edit_text(_lang["error_tg_server"])
+            if message:
+                await message.edit_text(_lang["error_tg_server"])
         except RTMPStreamingUnsupported:
             await self.stop(chat_id)
-            await message.edit_text(_lang["error_rtmp"])
+            if message:
+                await message.edit_text(_lang["error_rtmp"])
 
     async def seek(self, chat_id: int, seconds: int) -> None:
         if not await db.get_call(chat_id):
@@ -172,41 +179,36 @@ class TgCall(PyTgCalls):
         await self.play_media(chat_id, msg, media)
 
     async def play_next(self, chat_id: int) -> None:
-        """
-        Sıradaki şarkıya geçen fonksiyon. 
-        Döngü kontrolü burada yapılır.
-        """
-        # 1. Önce DÖNGÜ kontrolü yap
+        """Sıradaki şarkıya geçiş ve DÖNGÜ kontrolü."""
+        
+        # --- DÖNGÜ (LOOP) MANTIĞI BAŞLANGIÇ ---
         loop_count = await db.get_loop(chat_id)
         
         if loop_count > 0:
-            # Döngü varsa sayıyı azalt
             await db.decrease_loop(chat_id)
-            
-            # Sıradaki şarkıyı değil, MEVCUT şarkıyı tekrar al
-            media = queue.get_current(chat_id)
+            media = queue.get_current(chat_id) # Mevcut medyayı al
             
             if media:
                 _lang = await lang.get_lang(chat_id)
-                # Yeni bir bilgilendirme mesajı at (İsteğe bağlı, loop olduğu belli olsun diye)
-                msg = await app.send_message(chat_id=chat_id, text=_lang["play_next"]) 
+                # Kullanıcıya döngüde olduğunu bildiren mesaj (İsteğe bağlı metin düzenlenebilir)
+                loop_text = _lang.get("play_next", "🔄 Şarkı tekrarlanıyor...") 
+                msg = await app.send_message(chat_id=chat_id, text=loop_text)
                 media.message_id = msg.id
-                
-                # Şarkıyı tekrar oynat ve fonksiyondan çık
                 return await self.play_media(chat_id, msg, media)
+        # --- DÖNGÜ MANTIĞI BİTİŞ ---
 
-        # 2. Döngü yoksa normal sıradakine geç
+        # Döngü yoksa sıradaki şarkıya geç
         media = queue.get_next(chat_id)
         
         try:
             # Eski mesajı sil
-            if media and media.message_id:
+            old_media = queue.get_current(chat_id) # Temizlik için kontrol
+            if old_media and old_media.message_id:
                 await app.delete_messages(
                     chat_id=chat_id,
-                    message_ids=media.message_id,
+                    message_ids=old_media.message_id,
                     revoke=True,
                 )
-                media.message_id = 0
         except:
             pass
 
@@ -240,7 +242,7 @@ class TgCall(PyTgCalls):
         async def update_handler(_, update: types.Update) -> None:
             if isinstance(update, types.StreamEnded):
                 if update.stream_type == types.StreamEnded.Type.AUDIO:
-                    # Şarkı bittiğinde play_next çağrılır (Loop kontrolü orada yapılır)
+                    # Şarkı bittiğinde play_next çalışır (Döngü burada devreye girer)
                     await self.play_next(update.chat_id)
             elif isinstance(update, types.ChatUpdate):
                 if update.status in [
