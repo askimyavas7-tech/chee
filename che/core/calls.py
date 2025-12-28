@@ -1,3 +1,7 @@
+# Copyright (c) 2025 AnonymousX1025
+# Licensed under the MIT License.
+# This file is part of AnonXMusic
+
 import time
 from ntgcalls import (ConnectionNotFound, TelegramServerError,
                       RTMPStreamingUnsupported)
@@ -28,7 +32,6 @@ class TgCall(PyTgCalls):
         try:
             queue.clear(chat_id)
             await db.remove_call(chat_id)
-            await db.set_loop(chat_id, 0)
         except:
             pass
 
@@ -36,10 +39,6 @@ class TgCall(PyTgCalls):
             await client.leave_call(chat_id, close=False)
         except:
             pass
-
-    async def loop(self, chat_id: int, count: int) -> None:
-        """Döngü sayısını ayarlar."""
-        await db.set_loop(chat_id, count)
 
     async def play_media(
         self,
@@ -52,8 +51,7 @@ class TgCall(PyTgCalls):
         _lang = await lang.get_lang(chat_id)
         
         if not media.file_path:
-            if message:
-                await message.edit_text(_lang["error_no_file"].format(config.SUPPORT_CHAT))
+            await message.edit_text(_lang["error_no_file"].format(config.SUPPORT_CHAT))
             return await self.play_next(chat_id)
 
         # Video flag ayarı
@@ -83,8 +81,6 @@ class TgCall(PyTgCalls):
                 media.played_prefix = 0
                 media.time = 1
                 await db.add_call(chat_id)
-                
-                # Mesaj formatı
                 text = _lang["play_media"].format(
                     media.url,
                     media.title,
@@ -92,56 +88,36 @@ class TgCall(PyTgCalls):
                     media.user,
                 )
                 keyboard = buttons.controls(chat_id)
-                
-                # Mesajı gönderme veya düzenleme
                 try:
-                    if message:
-                        await message.edit_text(
-                            text=text,
-                            reply_markup=keyboard,
-                        )
-                        media.message_id = message.id
-                    else:
-                        msg = await app.send_message(
-                            chat_id=chat_id,
-                            text=text,
-                            reply_markup=keyboard,
-                        )
-                        media.message_id = msg.id
-                except MessageIdInvalid:
-                    # Mesaj silinmişse veya geçersizse yenisini at
-                    msg = await app.send_message(
-                        chat_id=chat_id,
+                    await message.edit_text(
                         text=text,
                         reply_markup=keyboard,
                     )
-                    media.message_id = msg.id
-                except Exception:
-                    pass
+                except MessageIdInvalid:
+                    media.message_id = (await app.send_message(
+                        chat_id=chat_id,
+                        text=text,
+                        reply_markup=keyboard,
+                    )).id
             else:
                 # Seek yapılıyorsa played_prefix güncellenir
                 media.played_prefix = seek_time
 
         except FileNotFoundError:
-            if message:
-                await message.edit_text(_lang["error_no_file"].format(config.SUPPORT_CHAT))
+            await message.edit_text(_lang["error_no_file"].format(config.SUPPORT_CHAT))
             await self.play_next(chat_id)
         except exceptions.NoActiveGroupCall:
             await self.stop(chat_id)
-            if message:
-                await message.edit_text(_lang["error_no_call"])
+            await message.edit_text(_lang["error_no_call"])
         except exceptions.NoAudioSourceFound:
-            if message:
-                await message.edit_text(_lang["error_no_audio"])
+            await message.edit_text(_lang["error_no_audio"])
             await self.play_next(chat_id)
         except (ConnectionNotFound, TelegramServerError):
             await self.stop(chat_id)
-            if message:
-                await message.edit_text(_lang["error_tg_server"])
+            await message.edit_text(_lang["error_tg_server"])
         except RTMPStreamingUnsupported:
             await self.stop(chat_id)
-            if message:
-                await message.edit_text(_lang["error_rtmp"])
+            await message.edit_text(_lang["error_rtmp"])
 
     async def seek(self, chat_id: int, seconds: int) -> None:
         if not await db.get_call(chat_id):
@@ -174,61 +150,20 @@ class TgCall(PyTgCalls):
         if not media:
             return
             
-        # --- DÜZELTME: Eski mesajı sil ---
-        try:
-            if media.message_id:
-                await app.delete_messages(chat_id, media.message_id)
-        except:
-            pass
-        # ---------------------------------
-
         _lang = await lang.get_lang(chat_id)
         msg = await app.send_message(chat_id=chat_id, text=_lang["play_again"])
-        
-        # Yeni mesaj ID'sini kaydet
-        media.message_id = msg.id
-        
         await self.play_media(chat_id, msg, media)
 
     async def play_next(self, chat_id: int) -> None:
-        """Sıradaki şarkıya geçiş ve DÖNGÜ kontrolü."""
-        
-        # --- DÖNGÜ (LOOP) MANTIĞI ---
-        loop_count = await db.get_loop(chat_id)
-        
-        if loop_count > 0:
-            await db.decrease_loop(chat_id)
-            media = queue.get_current(chat_id)
-            
-            if media:
-                # --- DÜZELTME: Döngüdeyken de eski mesajı temizle ---
-                try:
-                    if media.message_id:
-                        await app.delete_messages(chat_id, media.message_id)
-                except:
-                    pass
-                # ----------------------------------------------------
-
-                _lang = await lang.get_lang(chat_id)
-                loop_text = _lang.get("play_next", "🔄 Şarkı tekrarlanıyor...")
-                
-                msg = await app.send_message(chat_id=chat_id, text=loop_text)
-                media.message_id = msg.id # Yeni mesaj ID'sini ata
-                
-                return await self.play_media(chat_id, msg, media)
-
-        # Döngü yoksa sıradaki şarkıya geç
         media = queue.get_next(chat_id)
-        
-        # Önceki şarkının mesajını sil
         try:
-            old_media = queue.get_current(chat_id)
-            if old_media and old_media.message_id:
+            if media and media.message_id:
                 await app.delete_messages(
                     chat_id=chat_id,
-                    message_ids=old_media.message_id,
+                    message_ids=media.message_id,
                     revoke=True,
                 )
+                media.message_id = 0
         except:
             pass
 
@@ -258,6 +193,7 @@ class TgCall(PyTgCalls):
         return round(sum(pings) / len(pings), 2)
 
     async def decorators(self, client: PyTgCalls) -> None:
+        
         @client.on_update()
         async def update_handler(_, update: types.Update) -> None:
             if isinstance(update, types.StreamEnded):
@@ -277,5 +213,5 @@ class TgCall(PyTgCalls):
             client = PyTgCalls(ub, cache_duration=100)
             await client.start()
             self.clients.append(client)
-            await self.decorators(client)
+            await self.decorators(client) # Client tek tek gönderiliyor
         logger.info("PyTgCalls client(s) started.")
