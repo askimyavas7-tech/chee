@@ -1,11 +1,12 @@
 # Copyright (c) 2025 AnonymousX1025
 # Licensed under the MIT License.
-# This file is part of CheMusic
+# This file is part of AnonXMusic
 
 import time
 import logging
 from logging.handlers import RotatingFileHandler
 
+# Log ayarları
 logging.basicConfig(
     format="[%(asctime)s - %(levelname)s] - %(name)s: %(message)s",
     datefmt="%d-%b-%y %H:%M:%S",
@@ -22,17 +23,15 @@ logging.getLogger("pyrogram").setLevel(logging.ERROR)
 logging.getLogger("pytgcalls").setLevel(logging.ERROR)
 logger = logging.getLogger(__name__)
 
-
 __version__ = "3.0.1"
 
 from config import Config
-
 config = Config()
 config.check()
 tasks = []
 boot = time.time()
 
-# Paket yolları 'che' olarak güncellendi
+# Core bileşenlerin başlatılması
 from che.core.bot import Bot
 app = Bot()
 
@@ -45,7 +44,8 @@ userbot = Userbot()
 from che.core.mongo import MongoDB
 db = MongoDB()
 
-from che.core.lang import Language
+# DİL AYARLARI VE lang_codes EKLEMESİ
+from che.core.lang import Language, lang_codes # Buraya lang_codes eklendi
 lang = Language()
 
 from che.core.telegram import Telegram
@@ -57,8 +57,7 @@ from che.helpers import Queue
 queue = Queue()
 
 from che.core.calls import TgCall
-che = TgCall() # Değişken adı 'che' yapıldı
-
+anon = TgCall()
 
 async def stop() -> None:
     logger.info("Stopping...")
@@ -72,5 +71,4 @@ async def stop() -> None:
     await app.exit()
     await userbot.exit()
     await db.close()
-
     logger.info("Stopped.\n")
