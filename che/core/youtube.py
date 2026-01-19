@@ -1,3 +1,7 @@
+# Copyright (c) 2025 AnonymousX1025
+# Licensed under the MIT License.
+# This file is part of AnonXMusic
+
 
 import os
 import re
@@ -6,46 +10,50 @@ import random
 import asyncio
 import aiohttp
 from pathlib import Path
+
 from py_yt import Playlist, VideosSearch
+
 from che import logger
 from che.helpers import Track, utils
+
 
 class YouTube:
     def __init__(self):
         self.base = "https://www.youtube.com/watch?v="
-        self.cookie_dir = "anony/cookies"
-        self.cookies_file = f"{self.cookie_dir}/cookies.txt"
+        self.cookies = []
+        self.checked = False
+        self.cookie_dir = "che/cookies"
+        self.warned = False
         self.regex = re.compile(
             r"(https?://)?(www\.|m\.|music\.)?"
             r"(youtube\.com/(watch\?v=|shorts/|playlist\?list=)|youtu\.be/)"
             r"([A-Za-z0-9_-]{11}|PL[A-Za-z0-9_-]+)([&?][^\s]*)?"
         )
-        # KlasÃ¶r yoksa oluÅŸtur
-        if not os.path.exists(self.cookie_dir):
-            os.makedirs(self.cookie_dir)
 
     def get_cookies(self):
-        # YÃ–NTEM 1: Ortam DeÄŸiÅŸkeninden (Config Var) Oku ve Yaz
-        # Heroku'da GO_COOKIE adÄ±nda bir deÄŸiÅŸken oluÅŸturup iÃ§eriÄŸi oraya yapÄ±ÅŸtÄ±rÄ±n.
-        env_cookie = os.getenv("GO_COOKIE")
-        if env_cookie:
-            if not os.path.exists(self.cookies_file):
-                logger.info("Env deÄŸiÅŸkeninden cookie dosyasÄ± oluÅŸturuluyor...")
-                with open(self.cookies_file, "w") as f:
-                    f.write(env_cookie)
-            return self.cookies_file
+        if not self.checked:
+            for file in os.listdir(self.cookie_dir):
+                if file.endswith(".txt"):
+                    self.cookies.append(f"{self.cookie_dir}/{file}")
+            self.checked = True
+        if not self.cookies:
+            if not self.warned:
+                self.warned = True
+                logger.warning("Cookies are missing; downloads might fail.")
+            return None
+        return random.choice(self.cookies)
 
-        # YÃ–NTEM 2: KlasÃ¶rdeki dosyalarÄ± kontrol et
-        if os.path.exists(self.cookies_file):
-            return self.cookies_file
-        
-        # KlasÃ¶rdeki diÄŸer .txt dosyalarÄ±na bak
-        for file in os.listdir(self.cookie_dir):
-            if file.endswith(".txt"):
-                return f"{self.cookie_dir}/{file}"
-
-        logger.warning("DÄ°KKAT: Cookie dosyasÄ± bulunamadÄ±! Ä°ndirmeler baÅŸarÄ±sÄ±z olabilir.")
-        return None
+    async def save_cookies(self, urls: list[str]) -> None:
+        logger.info("Saving cookies from urls...")
+        async with aiohttp.ClientSession() as session:
+            for i, url in enumerate(urls):
+                path = f"{self.cookie_dir}/cookie_{i}.txt"
+                link = "https://batbin.me/api/v2/paste/" + url.split("/")[-1]
+                async with session.get(link) as resp:
+                    resp.raise_for_status()
+                    with open(path, "wb") as fw:
+                        fw.write(await resp.read())
+        logger.info(f"Cookies saved in {self.cookie_dir}.")
 
     def valid(self, url: str) -> bool:
         return bool(re.match(self.regex, url))
@@ -61,7 +69,7 @@ class YouTube:
                 duration=data.get("duration"),
                 duration_sec=utils.to_seconds(data.get("duration")),
                 message_id=m_id,
-                title=data.get("title")[:25],
+                title=data.get("title")[:90],
                 thumbnail=data.get("thumbnails", [{}])[-1].get("url").split("?")[0],
                 url=data.get("link"),
                 view_count=data.get("viewCount", {}).get("short"),
@@ -79,7 +87,7 @@ class YouTube:
                     channel_name=data.get("channel", {}).get("name", ""),
                     duration=data.get("duration"),
                     duration_sec=utils.to_seconds(data.get("duration")),
-                    title=data.get("title")[:25],
+                    title=data.get("title")[:90],
                     thumbnail=data.get("thumbnails")[-1].get("url").split("?")[0],
                     url=data.get("link").split("&list=")[0],
                     user=user,
@@ -99,8 +107,7 @@ class YouTube:
         if Path(filename).exists():
             return filename
 
-        cookie_path = self.get_cookies()
-        
+        cookie = self.get_cookies()
         base_opts = {
             "outtmpl": "downloads/%(id)s.%(ext)s",
             "quiet": True,
@@ -109,20 +116,8 @@ class YouTube:
             "no_warnings": True,
             "overwrites": False,
             "nocheckcertificate": True,
-            # GeliÅŸmiÅŸ Bot KorumasÄ± AyarlarÄ±
-            "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "referer": "https://www.youtube.com/",
-            "extractor_retries": 3,
-            "socket_timeout": 15,
+            "cookiefile": cookie,
         }
-
-        # EÄŸer cookie dosyasÄ± varsa ekle
-        if cookie_path:
-            base_opts["cookiefile"] = cookie_path
-        else:
-            # Cookie yoksa tarayÄ±cÄ± taklidi yapmayÄ± dene (Localhost iÃ§in)
-            # base_opts["cookiesfrombrowser"] = ("chrome",) 
-            pass
 
         if video:
             ydl_opts = {
@@ -137,15 +132,14 @@ class YouTube:
             }
 
         def _download():
-            # YoutubeDL nesnesini oluÅŸtur
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 try:
                     ydl.download([url])
-                except Exception as e:
-                    logger.error(f"Ä°ndirme hatasÄ±: {str(e)}")
-                    # EÄŸer Sign in hatasÄ± varsa ve cookie kullanÄ±yorsak, dosyayÄ± silip tekrar denemeyi Ã¶nlemek iÃ§in uyar
-                    if "Sign in" in str(e) and cookie_path:
-                        logger.error("KullandÄ±ÄŸÄ±nÄ±z Cookie PATLAMIÅ (GeÃ§ersiz). LÃ¼tfen yeni bir cookie alÄ±n.")
+                except (yt_dlp.utils.DownloadError, yt_dlp.utils.ExtractorError):
+                    if cookie: self.cookies.remove(cookie)
+                    return None
+                except Exception as ex:
+                    logger.warning("Download failed: %s", ex)
                     return None
             return filename
 
