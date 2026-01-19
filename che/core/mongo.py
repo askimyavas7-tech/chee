@@ -77,7 +77,7 @@ class MongoDB:
         return list(self.active_calls.keys())
 
     async def get_admins(self, chat_id: int, reload: bool = False) -> list[int]:
-        from anony.helpers._admins import reload_admins
+        from che.helpers._admins import reload_admins
 
         if chat_id not in self.admin_list or reload:
             self.admin_list[chat_id] = await reload_admins(chat_id)
