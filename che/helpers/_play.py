@@ -1,5 +1,6 @@
-
-
+# Copyright (c) 2025 AnonymousX1025
+# Licensed under the MIT License.
+# This file is part of AnonXMusic
 
 import asyncio
 
@@ -15,6 +16,7 @@ def checkUB(play):
             return await m.reply_text(m.lang["play_user_invalid"])
 
         chat_id = m.chat.id
+
         if m.chat.type != enums.ChatType.SUPERGROUP:
             await m.reply_text(m.lang["play_chat_invalid"])
             return await app.leave_chat(chat_id)
@@ -95,7 +97,7 @@ def checkUB(play):
                 except errors.InviteRequestSent:
                     await asyncio.sleep(2)
                     try:
-                        await client.approve_chat_join_request(chat_id, client.id)
+                        await app.approve_chat_join_request(chat_id, client.id)
                     except errors.HideRequesterMissing:
                         pass
                     except Exception as ex:
@@ -111,11 +113,10 @@ def checkUB(play):
                 await umm.delete()
                 await client.resolve_peer(chat_id)
 
-        if await db.get_cmd_delete(chat_id):
-            try:
-                await m.delete()
-            except:
-                pass
+        try:
+            await m.delete()
+        except:
+            pass
 
         return await play(_, m, force, m3u8, video, url)
 
