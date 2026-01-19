@@ -49,8 +49,13 @@ class TgCall(PyTgCalls):
         client = await db.get_assistant(chat_id)
         _lang = await lang.get_lang(chat_id)
         
-        
-        
+        # Resim oluşturma kısmı artık gerekli değil ama hata vermemesi için kalsın
+        # veya silebilirsiniz. Aşağıda kullanılmayacak.
+        _thumb = (
+            await thumb.generate(media)
+            if isinstance(media, Track)
+            else config.DEFAULT_THUMB
+        )
 
         if not media.file_path:
             await message.edit_text(_lang["error_no_file"].format(config.SUPPORT_CHAT))
