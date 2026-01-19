@@ -11,7 +11,7 @@ from pytgcalls import PyTgCalls, exceptions, types
 from pytgcalls.pytgcalls_session import PyTgCallsSession
 
 from che import app, config, db, lang, logger, queue, userbot, yt
-from che.helpers import Media, Track, buttons, thumb
+from che.helpers import Media, Track, buttons
 
 
 class TgCall(PyTgCalls):
