@@ -2,7 +2,6 @@
 # Licensed under the MIT License.
 # This file is part of AnonXMusic
 
-
 from ntgcalls import (ConnectionNotFound, TelegramServerError,
                       RTMPStreamingUnsupported)
 from pyrogram.errors import MessageIdInvalid
@@ -10,8 +9,8 @@ from pyrogram.types import InputMediaPhoto, Message
 from pytgcalls import PyTgCalls, exceptions, types
 from pytgcalls.pytgcalls_session import PyTgCallsSession
 
-from che import app, config, db, lang, logger, queue, userbot, yt
-from che.helpers import Media, Track, buttons
+from anony import app, config, db, lang, logger, queue, userbot, yt
+from anony.helpers import Media, Track, buttons, thumb
 
 
 class TgCall(PyTgCalls):
@@ -38,7 +37,6 @@ class TgCall(PyTgCalls):
         except:
             pass
 
-
     async def play_media(
         self,
         chat_id: int,
@@ -48,14 +46,9 @@ class TgCall(PyTgCalls):
     ) -> None:
         client = await db.get_assistant(chat_id)
         _lang = await lang.get_lang(chat_id)
-        
-        # Resim oluşturma kısmı artık gerekli değil ama hata vermemesi için kalsın
-        # veya silebilirsiniz. Aşağıda kullanılmayacak.
-        _thumb = (
-            await thumb.generate(media)
-            if isinstance(media, Track)
-            else config.DEFAULT_THUMB
-        )
+
+        # Hata veren _thumb oluşturma kısmı tamamen kaldırıldı.
+        # Artık edit_text kullandığınız için buna gerek yok.
 
         if not media.file_path:
             await message.edit_text(_lang["error_no_file"].format(config.SUPPORT_CHAT))
@@ -90,13 +83,11 @@ class TgCall(PyTgCalls):
                 )
                 keyboard = buttons.controls(chat_id)
                 try:
-                    # DEĞİŞİKLİK BURADA: edit_media yerine edit_text kullanıldı
                     await message.edit_text(
                         text=text,
                         reply_markup=keyboard,
                     )
                 except MessageIdInvalid:
-                    # DEĞİŞİKLİK BURADA: send_photo yerine send_message kullanıldı
                     media.message_id = (await app.send_message(
                         chat_id=chat_id,
                         text=text,
@@ -118,7 +109,6 @@ class TgCall(PyTgCalls):
             await self.stop(chat_id)
             await message.edit_text(_lang["error_rtmp"])
 
-
     async def replay(self, chat_id: int) -> None:
         if not await db.get_call(chat_id):
             return
@@ -127,7 +117,6 @@ class TgCall(PyTgCalls):
         _lang = await lang.get_lang(chat_id)
         msg = await app.send_message(chat_id=chat_id, text=_lang["play_again"])
         await self.play_media(chat_id, msg, media)
-
 
     async def play_next(self, chat_id: int) -> None:
         media = queue.get_next(chat_id)
@@ -158,11 +147,9 @@ class TgCall(PyTgCalls):
         media.message_id = msg.id
         await self.play_media(chat_id, msg, media)
 
-
     async def ping(self) -> float:
         pings = [client.ping for client in self.clients]
         return round(sum(pings) / len(pings), 2)
-
 
     async def decorators(self, client: PyTgCalls) -> None:
         for client in self.clients:
@@ -178,7 +165,6 @@ class TgCall(PyTgCalls):
                         types.ChatUpdate.Status.CLOSED_VOICE_CHAT,
                     ]:
                         await self.stop(update.chat_id)
-
 
     async def boot(self) -> None:
         PyTgCallsSession.notice_displayed = True
