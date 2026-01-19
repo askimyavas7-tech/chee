@@ -1,6 +1,4 @@
-# Copyright (c) 2025 AnonymousX1025
-# Licensed under the MIT License.
-# This file is part of AnonXMusic
+
 
 from ntgcalls import (ConnectionNotFound, TelegramServerError,
                       RTMPStreamingUnsupported)
@@ -9,8 +7,8 @@ from pyrogram.types import InputMediaPhoto, Message
 from pytgcalls import PyTgCalls, exceptions, types
 from pytgcalls.pytgcalls_session import PyTgCallsSession
 
-from anony import app, config, db, lang, logger, queue, userbot, yt
-from anony.helpers import Media, Track, buttons, thumb
+from che import app, config, db, lang, logger, queue, userbot, yt
+from che.helpers import Media, Track, buttons, thumb
 
 
 class TgCall(PyTgCalls):
