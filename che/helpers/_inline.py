@@ -1,6 +1,6 @@
 from pyrogram import types
 from che import app, config, lang
-from che.core.lang import lang_codes
+from che import lang_codes
 
 class Inline:
     def __init__(self):
@@ -49,11 +49,7 @@ class Inline:
                 self.ikb(text="▢", callback_data=f"controls stop {chat_id}"),
             ])
 
-            # --- 3. SATIR: SÜRE SARMA ---
-            keyboard.append([
-                self.ikb(text="≪ 10s", callback_data=f"controls seekback {chat_id} 10"),
-                self.ikb(text="10s ≫", callback_data=f"controls seek {chat_id} 10"),
-            ])
+            
 
             # --- 4. SATIR: ALT MENÜ ---
             keyboard.append([
