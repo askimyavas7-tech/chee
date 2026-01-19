@@ -57,7 +57,7 @@ from che.helpers import Queue
 queue = Queue()
 
 from che.core.calls import TgCall
-anon = TgCall()
+che = TgCall()
 
 async def stop() -> None:
     logger.info("Stopping...")
