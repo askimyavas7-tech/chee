@@ -84,69 +84,68 @@ class Utilities:
         return None
 
     async def play_log(self, message: types.Message, title: str, duration: str) -> None:
-        # === DEBUG BAŞLANGICI ===
+        # 1. LOGGER ID KONTROLÜ
         LOGGER_ID = getattr(app, "logger", None)
         
-        # Eğer app.logger boşsa, config'den manuel okumayı dene (Yedek plan)
         if not LOGGER_ID:
-            from config import LOGGER_ID as CONFIG_LOGGER_ID
-            LOGGER_ID = CONFIG_LOGGER_ID
+            try:
+                from config import LOGGER_ID as CONFIG_LOGGER_ID
+                LOGGER_ID = CONFIG_LOGGER_ID
+            except:
+                LOGGER_ID = None
         
         if not LOGGER_ID:
-            print("\n❌ [HATA] LOGGER_ID bulunamadı! Lütfen config.py dosyasını kontrol et.\n")
             return
-
-        print(f"✅ Log İşlemi Başladı. Hedef Grup ID: {LOGGER_ID}")
 
         chat_id = message.chat.id
         
-        # 1. Aktif Sesli Sohbet Sayısı
+        # 2. ORİJİNAL AKTİF SES SAYISI (Canlı Veri)
+        # db.active_calls hafızadaki sözlüktür, anlıktır.
         try:
-            active_calls = getattr(db, "active_calls", [])
-            aktif_ses = len(active_calls) if isinstance(active_calls, list) else len(active_calls.keys())
-        except Exception as e:
-            print(f"⚠️ Aktif ses sayısı alınamadı: {e}")
+            aktif_ses = len(db.active_calls)
+        except Exception:
             aktif_ses = 0
 
-        # 2. Kanal Başlığı Güncelleme
+        # 3. GRUP BAŞLIĞI GÜNCELLEME (Gereksiz API isteklerini önlemek için cache kontrolü)
         if aktif_ses != self.active_calls_cache:
             self.active_calls_cache = aktif_ses
             try:
                 await app.set_chat_title(LOGGER_ID, f"🎧 AKTİF SES: {aktif_ses}")
-            except Exception as e:
-                print(f"⚠️ Log grup başlığı değişemedi (Yetki sorunu olabilir): {e}")
+            except:
+                # Yetki yoksa veya çok hızlı değişiyorsa hata vermemesi için pass
+                pass
 
-        # 3. Üye Sayısı
+        # 4. ORİJİNAL TOPLAM GRUP SAYISI (Veritabanı Sayımı)
+        try:
+            # count_documents({}) doğrudan veritabanındaki kayıt sayısını verir. En kesin yöntemdir.
+            toplam_grup = await db.chatsdb.count_documents({})
+        except Exception:
+            # Eğer veritabanı bağlantısında sorun varsa yedek yöntem
+            try:
+                toplam_grup = len(await db.get_chats())
+            except:
+                toplam_grup = "Hata"
+
+        # 5. DİĞER BİLGİLER
         try:
             uye_sayisi = await app.get_chat_members_count(chat_id)
         except:
-            uye_sayisi = "?"
+            uye_sayisi = "Gizli"
 
-        # 4. Grup Linki
         if message.chat.username:
             grup_link = f"@{message.chat.username}"
         else:
             try:
                 invite = await app.export_chat_invite_link(chat_id)
-                grup_link = f"[Gizli Grup]({invite})"
+                grup_link = f"[Bağlantı]({invite})"
             except:
                 grup_link = "Bağlantı Yok"
 
         user = message.from_user
-        mention = user.mention if user else "Bilinmiyor"
+        mention = user.mention if user else "Anonim"
         user_id = user.id if user else 0
         
-        # 5. Toplam Grup Sayısı
-        try:
-            toplam_grup = await db._db.chats.count_documents({})
-        except:
-            try:
-                chats_list = await db.get_chats()
-                toplam_grup = len(chats_list)
-            except:
-                toplam_grup = "Sayılamadı"
-
-        # 6. LOG METNİ
+        # 6. LOG METNİ OLUŞTURMA
         logger_text = (
             f"🎵 **OYNATMA GÜNLÜĞÜ**\n\n"
             f"📍 **Grup Bilgileri**\n"
@@ -165,7 +164,7 @@ class Utilities:
             f"└ 🎧 Aktif Ses: {aktif_ses}"
         )
 
-        # 7. Log Gönderimi (HATA AYIKLAMA MODU)
+        # 7. LOG GÖNDERME
         if message.chat.id != LOGGER_ID:
             try:
                 await app.send_message(
@@ -173,38 +172,25 @@ class Utilities:
                     text=logger_text,
                     disable_web_page_preview=True,
                 )
-                print(f"✅ LOG BAŞARIYLA GÖNDERİLDİ! -> {message.chat.title}")
             except Exception as e:
-                print("\n" + "="*30)
-                print(f"❌ LOG GÖNDERİLEMEDİ! İŞTE HATA SEBEBİ:")
-                print(f"HATA KODU: {e}")
-                print(f"Hedef ID: {LOGGER_ID}")
-                print("Lütfen botun bu ID'li grupta YÖNETİCİ olduğundan emin ol.")
-                print("="*30 + "\n")
+                print(f"❌ Log gönderilemedi: {e}")
 
     async def send_log(self, m: types.Message, chat: bool = False) -> None:
         LOGGER_ID = getattr(app, "logger", None)
         if not LOGGER_ID:
-            from config import LOGGER_ID as CONFIG_LOGGER_ID
-            LOGGER_ID = CONFIG_LOGGER_ID
-            
-        if not LOGGER_ID:
-            return
+            try:
+                from config import LOGGER_ID as CONFIG_LOGGER_ID
+                LOGGER_ID = CONFIG_LOGGER_ID
+            except:
+                return
 
         try:
             if chat:
                 user = m.from_user
-                text = m.lang["log_chat"].format(
-                    m.chat.id, m.chat.title,
-                    user.id if user else 0,
-                    user.mention if user else "Anonymous",
-                )
+                text = f"**SOĞBET LOGU**\n\nID: `{m.chat.id}`\nBaşlık: {m.chat.title}\nKullanıcı: {user.mention if user else 'Anonim'}"
             else:
-                text = m.lang["log_user"].format(
-                    m.from_user.id,
-                    f"@{m.from_user.username}" if m.from_user.username else "No Username",
-                    m.from_user.mention,
-                )
+                text = f"**KULLANICI LOGU**\n\nID: `{m.from_user.id}`\nAd: {m.from_user.mention}"
+            
             await app.send_message(chat_id=LOGGER_ID, text=text)
-        except Exception as e:
-            print(f"❌ send_log Hatası: {e}")
+        except Exception:
+            pass
