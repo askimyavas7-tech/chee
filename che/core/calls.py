@@ -51,7 +51,6 @@ class TgCall(PyTgCalls):
         
         
         
-        )
 
         if not media.file_path:
             await message.edit_text(_lang["error_no_file"].format(config.SUPPORT_CHAT))
