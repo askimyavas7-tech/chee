@@ -16,7 +16,7 @@ async def _stop(_, m: types.Message):
     if len(m.command) > 1:
         return
 
-    await anon.stop(m.chat.id)
+    await che.stop(m.chat.id)
     if not await db.get_call(m.chat.id):
         return await m.reply_text(m.lang["not_playing"])
 
