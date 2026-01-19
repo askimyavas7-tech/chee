@@ -10,3 +10,4 @@ python-dotenv~=1.1.1
 yt-dlp[default]>=2025.12.8
 motor
 speedtest
+git+https://github.com/AshokShau/pytgcalls@master
