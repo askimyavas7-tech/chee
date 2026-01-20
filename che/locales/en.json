@@ -98,7 +98,7 @@
   "queue_fetching": "⌛ Kuyruk listesi alınıyor...",
   "restarting": "🔄 Sistem yeniden başlatılıyor...",
   "restarted": "⚙️ Yeniden başlatma işlemi tamamlanmak üzere...",
-  "start_pm": "🌟 Hoş geldin {0},\n\nBen {1}, gelişmiş özelliklere sahip yeni nesil bir müzik botuyum. 🎶\n\n✅ Özellikler:\n⚡️ Hızlı ve stabil bağlantı\n🖼 Görüntülü sohbet desteği\n💎 Kristal netliğinde ses kalitesi\n\n👉 Komutlarımı incelemek için Yardım butonuna tıklayabilirsin."
+  "start_pm": "🌟 Hoş geldin {0},\n\nBen {1}, gelişmiş özelliklere sahip yeni nesil bir müzik botuyum. 🎶\n\n✅ Özellikler:\n⚡️ Hızlı ve stabil bağlantı\n🖼 Görüntülü sohbet desteği\n💎 Kristal netliğinde ses kalitesi\n\n👉 Komutlarımı incelemek için Yardım butonuna tıklayabilirsin.",
   "start_gp": "Selamlar,\nBen {0}!\n\n<u><b>Sesli sohbetlerinizde yüksek kalitede müzik çalmak için buradayım.</b></u>",
   "start_settings": "<u><b>⚙️ {0} Ayarları</b></u>\n\nSohbet ayarlarını yapılandırmak için aşağıdaki butonları kullanın.",
   "stats_fetching": "📊 İstatistikler toplanıyor...",
