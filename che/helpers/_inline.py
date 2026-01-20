@@ -34,8 +34,7 @@ class Inline:
             ])
 
         if not remove:
-            # --- 1. SATIR: DÖNGÜ ve TEKRAR (BURASI EKLENDİ) ---
-            # Loop butonu: 'controls loop' komutunu tetikler
+            # --- 1. SATIR: DÖNGÜ ve TEKRAR ---
             keyboard.append([
                 self.ikb(text="TEKRAR", callback_data=f"controls replay {chat_id}"),
                 
@@ -48,8 +47,6 @@ class Inline:
                 self.ikb(text="‣‣I", callback_data=f"controls skip {chat_id}"),
                 self.ikb(text="▢", callback_data=f"controls stop {chat_id}"),
             ])
-
-            
 
             # --- 4. SATIR: ALT MENÜ ---
             keyboard.append([
@@ -115,7 +112,14 @@ class Inline:
 
     def start_key(self, lang_dict: dict, private: bool = False) -> types.InlineKeyboardMarkup:
         """Start komutu butonları."""
+        
+        # ID'yi alıyoruz
         oid = config.OWNER_ID
+        
+        # Eğer config'de ID liste halindeyse (ör: [12345, 67890]), ilkini alarak hatayı önlüyoruz.
+        if isinstance(oid, list):
+            oid = oid[0]
+
         return self.ikm([
             [
                 self.ikb(text="✦ Beni Gruba Ekle ✦", url=f"https://t.me/{app.username}?startgroup=true")
@@ -125,7 +129,7 @@ class Inline:
                 self.ikb(text="Destek", url=config.SUPPORT_CHAT)
             ],
             [
-                self.ikb(text="Geliştirici", url=f"tg://user?id={oid}")
+                self.ikb(text="👤 Sahip", url=f"tg://user?id={oid}")
             ]
         ])
 
