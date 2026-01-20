@@ -116,10 +116,16 @@ class Inline:
         # ID'yi alıyoruz
         oid = config.OWNER_ID
         
-        # Eğer config'de ID liste halindeyse (ör: [12345, 67890]), ilkini alarak hatayı önlüyoruz.
+        # Eğer config'de ID liste halindeyse (ör: [12345, 67890]), ilkini al
         if isinstance(oid, list):
             oid = oid[0]
 
+        # Sayısal değere çevir (Garanti olması için)
+        try:
+            oid = int(oid)
+        except:
+            pass
+            
         return self.ikm([
             [
                 self.ikb(text="✦ Beni Gruba Ekle ✦", url=f"https://t.me/{app.username}?startgroup=true")
@@ -129,6 +135,7 @@ class Inline:
                 self.ikb(text="Destek", url=config.SUPPORT_CHAT)
             ],
             [
+                # tg://user?id= OID formatı, tıklandığında direkt o kişinin profilini açar.
                 self.ikb(text="👤 Sahip", url=f"tg://user?id={oid}")
             ]
         ])
