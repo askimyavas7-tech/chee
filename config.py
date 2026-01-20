@@ -29,8 +29,8 @@ SESSION1 = getenv("SESSION", None)
 SESSION2 = getenv("SESSION2", None)
 SESSION3 = getenv("SESSION3", None)
 
-SUPPORT_CHANNEL = getenv("SUPPORT_CHANNEL", "https://t.me/paynexmusiccc")
-SUPPORT_CHAT = getenv("SUPPORT_CHAT", "https://t.me/paynexmusiccc")
+SUPPORT_CHANNEL = getenv("SUPPORT_CHANNEL", "https://t.me/mytduyur")
+SUPPORT_CHAT = getenv("SUPPORT_CHAT", "https://t.me/mytduyur")
 
 def is_enabled(value):
     if str(value).lower() in ["true", "yes", "1", "on", "t"]:
