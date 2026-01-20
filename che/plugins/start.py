@@ -12,6 +12,8 @@ from che.helpers import buttons, utils
 @app.on_message(filters.command(["help"]) & filters.private & ~app.bl_users)
 @lang.language()
 async def _help(_, m: types.Message):
+    # Yardım mesajı gönderilirken "yazıyor..." efekti gösterir
+    await app.send_chat_action(m.chat.id, enums.ChatAction.TYPING)
     await m.reply_text(
         text=m.lang["help_menu"],
         reply_markup=buttons.help_markup(m.lang),
@@ -29,6 +31,10 @@ async def start(_, message: types.Message):
         return await _help(_, message)
 
     private = message.chat.type == enums.ChatType.PRIVATE
+    
+    # Bot yanıt vermeden önce "yazıyor..." durumu gösterir
+    await app.send_chat_action(message.chat.id, enums.ChatAction.TYPING)
+    
     _text = (
         message.lang["start_pm"].format(message.from_user.first_name, app.name)
         if private
@@ -36,11 +42,14 @@ async def start(_, message: types.Message):
     )
 
     key = buttons.start_key(message.lang, private)
-    await message.reply_photo(
-        photo=config.START_IMG,
-        caption=_text,
+    
+    # RESİMSİZ: reply_photo yerine reply_text kullanıldı
+    # disable_web_page_preview=True ile link önizlemeleri kapatıldı
+    await message.reply_text(
+        text=_text,
         reply_markup=key,
         quote=not private,
+        disable_web_page_preview=True
     )
 
     if private:
@@ -58,6 +67,9 @@ async def start(_, message: types.Message):
 @app.on_message(filters.command(["playmode", "settings"]) & filters.group & ~app.bl_users)
 @lang.language()
 async def settings(_, message: types.Message):
+    # Ayarlar açılırken "yazıyor..." efekti
+    await app.send_chat_action(message.chat.id, enums.ChatAction.TYPING)
+    
     admin_only = await db.get_play_mode(message.chat.id)
     cmd_delete = await db.get_cmd_delete(message.chat.id)
     _language = await db.get_lang(message.chat.id)
