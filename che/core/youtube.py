@@ -23,6 +23,7 @@ class YouTube:
         self.checked = False
         self.cookie_dir = "che/cookies"
         self.warned = False
+
         self.regex = re.compile(
             r"(https?://)?(www\.|m\.|music\.)?"
             r"(youtube\.com/(watch\?v=|shorts/|playlist\?list=)|youtu\.be/)"
@@ -43,13 +44,13 @@ class YouTube:
         if not self.cookies:
             if not self.warned:
                 self.warned = True
-                logger.warning("⚠️ YouTube cookies not found!")
+                logger.warning("⚠️ YouTube cookies not found, continuing without cookies.")
             return None
 
         return random.choice(self.cookies)
 
     async def save_cookies(self, urls: list[str]) -> None:
-        logger.info("Saving cookies from urls...")
+        logger.info("Saving cookies...")
         async with aiohttp.ClientSession() as session:
             for i, url in enumerate(urls):
                 path = f"{self.cookie_dir}/cookie_{i}.txt"
@@ -73,13 +74,14 @@ class YouTube:
             return None
 
         data = results["result"][0]
+
         return Track(
             id=data.get("id"),
             channel_name=data.get("channel", {}).get("name", ""),
             duration=data.get("duration"),
             duration_sec=utils.to_seconds(data.get("duration")),
             message_id=m_id,
-            title=data.get("title")[:90],
+            title=data.get("title", "")[:90],
             thumbnail=data.get("thumbnails", [{}])[-1].get("url", "").split("?")[0],
             url=data.get("link"),
             view_count=data.get("viewCount", {}).get("short"),
@@ -91,16 +93,16 @@ class YouTube:
         tracks = []
         try:
             plist = await Playlist.get(url)
-            for data in plist["videos"][:limit]:
+            for data in plist.get("videos", [])[:limit]:
                 tracks.append(
                     Track(
                         id=data.get("id"),
                         channel_name=data.get("channel", {}).get("name", ""),
                         duration=data.get("duration"),
                         duration_sec=utils.to_seconds(data.get("duration")),
-                        title=data.get("title")[:90],
-                        thumbnail=data.get("thumbnails")[-1].get("url", "").split("?")[0],
-                        url=data.get("link").split("&list=")[0],
+                        title=data.get("title", "")[:90],
+                        thumbnail=data.get("thumbnails", [{}])[-1].get("url", "").split("?")[0],
+                        url=data.get("link", "").split("&list=")[0],
                         user=user,
                         view_count="",
                         video=video,
@@ -130,22 +132,28 @@ class YouTube:
             "no_warnings": True,
             "overwrites": False,
             "nocheckcertificate": True,
-            "cookiefile": cookie,
+            "source_address": "0.0.0.0",
+            "default_search": "ytsearch",
+            "extract_flat": False,
             "extractor_args": {
                 "youtube": {
-                    "player_client": ["android"]
+                    "player_client": ["android", "web", "tv_embedded"]
                 }
             },
         }
 
+        # Cookie sadece varsa eklenir
+        if cookie:
+            ydl_opts["cookiefile"] = cookie
+
         if video:
             ydl_opts.update({
-                "format": "(bestvideo[ext=mp4][height<=720]/bestvideo)+bestaudio/best",
+                "format": "bestvideo[height<=720]+bestaudio/best",
                 "merge_output_format": "mp4",
             })
         else:
             ydl_opts.update({
-                "format": "bestaudio[ext=m4a]/bestaudio/best",
+                "format": "bestaudio/best",
             })
 
         def _download():
@@ -154,7 +162,7 @@ class YouTube:
                     ydl.download([url])
                 return filename
             except Exception as e:
-                logger.warning("YouTube download failed: %s", e)
+                logger.error("YouTube download failed: %s", e)
                 return None
 
         return await asyncio.to_thread(_download)
