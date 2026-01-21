@@ -2,7 +2,6 @@
 # Licensed under the MIT License.
 # This file is part of AnonXMusic
 
-
 from pathlib import Path
 
 from pyrogram import filters, types
@@ -20,8 +19,9 @@ def playlist_to_queue(chat_id: int, tracks: list) -> str:
     text = text[:1948] + "</blockquote>"
     return text
 
+
 @app.on_message(
-    filters.command(["play", "oynat","voynat","playforce", "vplay", "vplayforce"])
+    filters.command(["play", "oynat", "voynat", "playforce", "vplay", "vplayforce"])
     & filters.group
     & ~app.bl_users
 )
@@ -41,6 +41,7 @@ async def play_hndlr(
     media = tg.get_media(m.reply_to_message) if m.reply_to_message else None
     tracks = []
 
+    # URL ile oynatma
     if url:
         if "playlist" in url:
             await sent.edit_text(m.lang["playlist_fetch"])
@@ -62,6 +63,7 @@ async def play_hndlr(
                 m.lang["play_not_found"].format(config.SUPPORT_CHAT)
             )
 
+    # Arama ile oynatma
     elif len(m.command) >= 2:
         query = " ".join(m.command[1:])
         file = await yt.search(query, sent.id, video=video)
@@ -70,6 +72,7 @@ async def play_hndlr(
                 m.lang["play_not_found"].format(config.SUPPORT_CHAT)
             )
 
+    # Telegram medya
     elif media:
         setattr(sent, "lang", m.lang)
         file = await tg.download(m.reply_to_message, sent)
@@ -86,6 +89,8 @@ async def play_hndlr(
         await utils.play_log(m, file.title, file.duration)
 
     file.user = mention
+
+    # Kuyruk işlemleri
     if force:
         queue.force_add(m.chat.id, file)
     else:
@@ -112,19 +117,28 @@ async def play_hndlr(
                 )
             return
 
+    # 🔥 ASIL DÜZELTİLEN KISIM
     if not file.file_path:
-        fname = f"downloads/{file.id}.{'mp4' if video else 'webm'}"
+        fname = f"downloads/{file.id}.{'mp4' if video else 'm4a'}"
+
         if Path(fname).exists():
             file.file_path = fname
         else:
             await sent.edit_text(m.lang["play_downloading"])
             file.file_path = await yt.download(file.id, video=video)
 
+            # ❗ İNDİRME BAŞARISIZSA
+            if not file.file_path or not Path(file.file_path).exists():
+                return await sent.edit_text(
+                    "❌ Müzik indirilemedi (YouTube erişim hatası)"
+                )
+
+    # Oynat
     await che.play_media(chat_id=m.chat.id, message=sent, media=file)
-    if not tracks:
-        return
-    added = playlist_to_queue(m.chat.id, tracks)
-    await app.send_message(
-        chat_id=m.chat.id,
-        text=m.lang["playlist_queued"].format(len(tracks)) + added,
-    )
+
+    if tracks:
+        added = playlist_to_queue(m.chat.id, tracks)
+        await app.send_message(
+            chat_id=m.chat.id,
+            text=m.lang["playlist_queued"].format(len(tracks)) + added,
+            )
